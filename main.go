@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	// sensible defaults to be overridden when we read in screen dimensions
 	UID    string = "foo"
 	WIDTH  int    = 60
 	HEIGHT int    = 15
@@ -49,6 +50,8 @@ func main() {
 		log.Fatal("unable to get screen dimensions - ", err)
 	}
 	s := NewScreen(screenX, screenY)
+	HEIGHT = screenY
+	WIDTH = screenX
 
 	s.cursor.ModeRaw()
 	defer s.cursor.ModeRestore()
@@ -82,7 +85,7 @@ func main() {
 	}()
 
 	go func() {
-		for _ = range time.Tick(time.Millisecond * 500) {
+		for _ = range time.Tick(time.Millisecond * 100) {
 			s.Paint()
 		}
 	}()
@@ -104,7 +107,8 @@ func (s *screen) Paint() {
 
 	resp, err := http.Get(fmt.Sprintf("http://localhost:8888?uid=%s&w=%d&h=%d", UID, WIDTH, HEIGHT))
 	if err != nil {
-		// todo
+		fmt.Println("Server Connection Lost - ", err)
+		return
 	}
 	reader := bufio.NewReader(resp.Body)
 
