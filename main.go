@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/sethgrid/curse"
@@ -15,9 +16,12 @@ import (
 
 var (
 	// sensible defaults to be overridden when we read in screen dimensions
-	UID    string = "foo"
-	WIDTH  int    = 60
-	HEIGHT int    = 15
+	UID          string = "foo"
+	WIDTH        int    = 60
+	HEIGHT       int    = 15
+	CONSOLE_MODE bool   = false
+	PREV_COMMAND string = ""
+	COMMAND      string = ""
 )
 
 type screen struct {
@@ -50,8 +54,8 @@ func main() {
 		log.Fatal("unable to get screen dimensions - ", err)
 	}
 	s := NewScreen(screenX, screenY)
-	HEIGHT = screenY
-	WIDTH = screenX
+	HEIGHT = screenY - 1 - 3 // 3 lines for COMMAND input
+	WIDTH = screenX - 1
 
 	s.cursor.ModeRaw()
 	defer s.cursor.ModeRestore()
@@ -65,21 +69,34 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			}
-			if string(command) == "w" {
-				sendCommand("mw")
-			} else if string(command) == "s" {
-				sendCommand("ms")
-			} else if string(command) == "a" {
-				sendCommand("ma")
-			} else if string(command) == "d" {
-				sendCommand("md")
-			} else if string(command) == "q" {
-				sendCommand("q")
-				s.cursor.Move(1, 1)
-				s.cursor.SetDefaultStyle()
-				s.cursor.EraseAll()
-				close(quit)
-				break
+			if CONSOLE_MODE {
+				if string(command) == ";" || command == '\r' {
+					processCommand()
+				} else if command == '\b' || command == '\b' {
+					COMMAND = COMMAND[:len(COMMAND)-1]
+				} else {
+					COMMAND += string(command)
+				}
+			} else {
+				if string(command) == ":" {
+					CONSOLE_MODE = true
+				}
+				if string(command) == "w" {
+					sendCommand("mw")
+				} else if string(command) == "s" {
+					sendCommand("ms")
+				} else if string(command) == "a" {
+					sendCommand("ma")
+				} else if string(command) == "d" {
+					sendCommand("md")
+				} else if string(command) == "q" {
+					sendCommand("q")
+					s.cursor.Move(1, 1)
+					s.cursor.SetDefaultStyle()
+					s.cursor.EraseAll()
+					close(quit)
+					break
+				}
 			}
 		}
 	}()
@@ -91,6 +108,12 @@ func main() {
 	}()
 
 	<-quit
+}
+
+func processCommand() {
+	PREV_COMMAND = COMMAND
+	COMMAND = ""
+	CONSOLE_MODE = false
 }
 
 func NewScreen(x, y int) *screen {
@@ -125,6 +148,10 @@ func (s *screen) Paint() {
 			break
 		}
 	}
+	fmt.Println(strings.Repeat("=", WIDTH))
+	fmt.Println("\r q to quit. w,a,s,d to move. Press `:` to enter command mode.")
+	fmt.Println("\r", PREV_COMMAND)
+	fmt.Printf("\r:%s", COMMAND)
 }
 
 func sendCommand(cmd string) {
