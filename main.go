@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -111,6 +112,18 @@ func main() {
 }
 
 func processCommand() {
+	if COMMAND == "resize" {
+		screenX, screenY, err := curse.GetScreenDimensions()
+		if err != nil {
+			log.Fatal("unable to get screen dimensions - ", err)
+		}
+		// todo - dry this up
+		HEIGHT = screenY - 1 - 3 // 3 lines for COMMAND input
+		WIDTH = screenX - 1
+		COMMAND = fmt.Sprintf("resize %d %d", WIDTH, HEIGHT)
+	}
+
+	sendCommand(">" + COMMAND)
 	PREV_COMMAND = COMMAND
 	COMMAND = ""
 	CONSOLE_MODE = false
@@ -151,9 +164,14 @@ func (s *screen) Paint() {
 	fmt.Println(strings.Repeat("=", WIDTH))
 	fmt.Println("\r q to quit. w,a,s,d to move. Press `:` to enter command mode.")
 	fmt.Println("\r", PREV_COMMAND)
-	fmt.Printf("\r:%s", COMMAND)
+	if CONSOLE_MODE {
+		fmt.Printf("\r>:%s", COMMAND)
+	} else {
+		fmt.Printf("\r>")
+	}
 }
 
 func sendCommand(cmd string) {
+	cmd = url.QueryEscape(cmd)
 	http.Get("http://localhost:8888/cmd?uid=" + UID + "&key=" + cmd)
 }
