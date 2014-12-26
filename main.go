@@ -25,6 +25,11 @@ var (
 	COMMAND      string = ""
 )
 
+const (
+	ESC = 27
+	DEL = 127
+)
+
 type screen struct {
 	width, height int
 	surface       map[string]*position
@@ -73,16 +78,16 @@ func main() {
 			if CONSOLE_MODE {
 				if string(command) == ";" || command == '\r' {
 					processCommand()
-				} else if command == '\b' || command == '\b' {
+				} else if (command == '\b' || command == DEL) && (len(COMMAND) > 1) {
 					COMMAND = COMMAND[:len(COMMAND)-1]
 				} else {
 					COMMAND += string(command)
 				}
 			} else {
-				if string(command) == ":" {
+				// todo: use switch
+				if string(command) == ":" || command == ESC {
 					CONSOLE_MODE = true
-				}
-				if string(command) == "w" {
+				} else if string(command) == "w" {
 					sendCommand("mw")
 				} else if string(command) == "s" {
 					sendCommand("ms")
@@ -90,6 +95,11 @@ func main() {
 					sendCommand("ma")
 				} else if string(command) == "d" {
 					sendCommand("md")
+				} else if string(command) == "." {
+					COMMAND = PREV_COMMAND
+					COMMAND = strings.Replace(PREV_COMMAND, " (ok)", "", 1)
+					COMMAND = strings.Replace(PREV_COMMAND, " (not ok)", "", 1)
+					processCommand()
 				} else if string(command) == "q" {
 					sendCommand("q")
 					s.cursor.Move(1, 1)
@@ -97,6 +107,8 @@ func main() {
 					s.cursor.EraseAll()
 					close(quit)
 					break
+				} else {
+					// log.Fatal(command)
 				}
 			}
 		}
@@ -123,8 +135,13 @@ func processCommand() {
 		COMMAND = fmt.Sprintf("resize %d %d", WIDTH, HEIGHT)
 	}
 
-	sendCommand(">" + COMMAND)
-	PREV_COMMAND = COMMAND
+	success := sendCommand(">" + COMMAND)
+
+	suffix := " (not ok)"
+	if success {
+		suffix = " (ok)"
+	}
+	PREV_COMMAND = COMMAND + suffix
 	COMMAND = ""
 	CONSOLE_MODE = false
 }
@@ -171,7 +188,12 @@ func (s *screen) Paint() {
 	}
 }
 
-func sendCommand(cmd string) {
+func sendCommand(cmd string) bool {
 	cmd = url.QueryEscape(cmd)
-	http.Get("http://localhost:8888/cmd?uid=" + UID + "&key=" + cmd)
+	resp, err := http.Get("http://localhost:8888/cmd?uid=" + UID + "&key=" + cmd)
+	if err != nil {
+		return false
+	}
+
+	return resp.StatusCode == http.StatusOK
 }
