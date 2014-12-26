@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -78,8 +79,12 @@ func main() {
 			if CONSOLE_MODE {
 				if string(command) == ";" || command == '\r' {
 					processCommand()
-				} else if (command == '\b' || command == DEL) && (len(COMMAND) > 1) {
-					COMMAND = COMMAND[:len(COMMAND)-1]
+				} else if command == '\b' || command == DEL {
+					if len(COMMAND) > 1 {
+						COMMAND = COMMAND[:len(COMMAND)-1]
+					} else {
+						COMMAND = ""
+					}
 				} else {
 					COMMAND += string(command)
 				}
@@ -135,12 +140,17 @@ func processCommand() {
 		COMMAND = fmt.Sprintf("resize %d %d", WIDTH, HEIGHT)
 	}
 
-	success := sendCommand(">" + COMMAND)
+	success, message := sendCommand(">" + COMMAND)
 
 	suffix := " (not ok)"
 	if success {
 		suffix = " (ok)"
 	}
+
+	if message != "" {
+		suffix = " - " + message
+	}
+
 	PREV_COMMAND = COMMAND + suffix
 	COMMAND = ""
 	CONSOLE_MODE = false
@@ -188,12 +198,18 @@ func (s *screen) Paint() {
 	}
 }
 
-func sendCommand(cmd string) bool {
+func sendCommand(cmd string) (bool, string) {
 	cmd = url.QueryEscape(cmd)
 	resp, err := http.Get("http://localhost:8888/cmd?uid=" + UID + "&key=" + cmd)
 	if err != nil {
-		return false
+		return false, err.Error()
 	}
 
-	return resp.StatusCode == http.StatusOK
+	// todo: handle err
+	message, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return resp.StatusCode == http.StatusOK, string(message)
 }
