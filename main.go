@@ -102,8 +102,9 @@ func main() {
 					sendCommand("md")
 				} else if string(command) == "." {
 					COMMAND = PREV_COMMAND
-					COMMAND = strings.Replace(PREV_COMMAND, " (ok)", "", 1)
-					COMMAND = strings.Replace(PREV_COMMAND, " (not ok)", "", 1)
+					processCommand()
+				} else if string(command) == "x" {
+					COMMAND = "attack"
 					processCommand()
 				} else if string(command) == "q" {
 					sendCommand("q")
@@ -139,6 +140,9 @@ func processCommand() {
 		WIDTH = screenX - 1
 		COMMAND = fmt.Sprintf("resize %d %d", WIDTH, HEIGHT)
 	}
+
+	COMMAND = strings.Replace(COMMAND, " (ok)", "", -1)
+	COMMAND = strings.Replace(COMMAND, " (not ok)", "", -1)
 
 	success, message := sendCommand(">" + COMMAND)
 
