@@ -177,6 +177,7 @@ func (s *screen) Paint() {
 		fmt.Println("Server Connection Lost - ", err)
 		return
 	}
+	defer resp.Body.Close()
 	reader := bufio.NewReader(resp.Body)
 
 	for {
@@ -208,6 +209,7 @@ func sendCommand(cmd string) (bool, string) {
 	if err != nil {
 		return false, err.Error()
 	}
+	defer resp.Body.Close()
 
 	// todo: handle err
 	message, err := ioutil.ReadAll(resp.Body)
